@@ -1,0 +1,33 @@
+F box[
+
+T TEXT 1
+
+F box2[
+T TEXT 2
+F box3[
+T TEXT 3
+F box4[
+T TEXT 4
+F box5[
+T TEXT 5
+]
+]
+]
+]
+
+T TEXT 3
+T TEXT 4
+](arg1,arg2)
+
+F Lastbox[
+
+T LastTEXT
+
+](arg1,arg2)
+T FREETEXT
+
+F LastLastbox[
+
+T LastLastTEXT
+
+]
