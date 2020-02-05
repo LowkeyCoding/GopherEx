@@ -23,9 +23,6 @@ func (tokenizer Tokenizer) peak() string {
 	if len(tokenizer.code) > tokenizer.index+1 {
 		return tokenizer.code[tokenizer.index+1]
 	}
-	//FJENEDE DEN SÅ PROGRAMMET IKKE CRASHER VIS DER ER KUN ET ELEMENT TILBAGE OG DEN PRØVER AT KIGGE UD OVER DEN.
-	//fmt.Println("[ERROR] TRIED TO ACCES TOKEN BEYOND EOF")
-	//os.Exit(38) //ERROR_HANDLE_EOF
 	return ""
 }
 
@@ -40,20 +37,6 @@ func (tokenizer *Tokenizer) next() string {
 }
 
 func main() {
-	/*
-			sourceCode := `
-		F box 192.1.168.147[
-
-		T hello ma friend
-
-		box2 192.1.168.148[
-
-		]
-
-
-		]()
-
-		`*/
 	b, err := ioutil.ReadFile("file.txt") // just pass the file name
 	if err != nil {
 		fmt.Print(err)
@@ -61,24 +44,17 @@ func main() {
 	sourceCode := string(b)
 	cleanCode := sanitize(sourceCode)
 	parsedCode := parseCode(cleanCode)
-	//fmt.Println("________________________S")
-	//printCode(parsedCode)
-	//printCode(cleanCode)
-	//printCode(parsedCode)
 	fmt.Println("")
 	printTokens(tokenizeCode(parsedCode), 0)
 	fmt.Println("")
 }
 
 func sanitize(str string) []string {
-
-	//str = str[1:] //Remove First newline
 	tempCode := strings.Split(str, "\n")
 
 	for index := range tempCode {
 		tempCode[index] = strings.Replace(tempCode[index], string(rune(13)), "", -1) // REMOVE 13/CR
 
-		//REMOVE EXAMPLE "    T HELLO MA FRIEND" = "T HELLO MA FRIEND"
 		if tempCode[index] != "" {
 			i := 0
 			for string(tempCode[index][i]) == " " {
@@ -94,11 +70,10 @@ func sanitize(str string) []string {
 
 	var array []string
 	for _, _string := range tempCode {
-		if _string == "" {
-			//fmt.Println(_string)
-		} else {
+		if _string != "" {
 			array = append(array, _string)
 		}
+
 	}
 	return array
 }
@@ -137,7 +112,7 @@ func tokenizeCode(code []string) []Token {
 
 	tokenizer := Tokenizer{code, -1}
 	tokens := make([]Token, 0)
-	TmpToken := Token{make([]string, 0), make([]Token, 0)}
+	tempToken := Token{make([]string, 0), make([]Token, 0)}
 
 	for tokenizer.index < len(code)-1 {
 		element := tokenizer.next()
@@ -155,30 +130,29 @@ func tokenizeCode(code []string) []Token {
 				}
 				i++
 			}
-			TmpToken.prefix = append(TmpToken.prefix, strings.Split(element, " ")...)
-			TmpToken.array = tokenizeCode(code[tokenizer.index+2 : i+tokenizer.index]) //CALL FUNCTION
+			tempToken.prefix = append(tempToken.prefix, strings.Split(element, " ")...)
+			tempToken.array = tokenizeCode(code[tokenizer.index+2 : i+tokenizer.index]) //CALL FUNCTION
 
 			tokenizer.index += i              //SKIP BEYOND FUNCTION
 			if tokenizer.index >= len(code) { //NO MORE TOKENS RETURN LAST
-				//fmt.Println("LAST ELEMENT", element)
-				TmpToken.prefix = nil
-				TmpToken.prefix = append(TmpToken.prefix, strings.Split(element, " ")...)
-				tokens = append(tokens, TmpToken)
+				tempToken.prefix = nil
+				tempToken.prefix = append(tempToken.prefix, strings.Split(element, " ")...)
+				tokens = append(tokens, tempToken)
 				return tokens
 			}
 
 			if string(code[tokenizer.index][0]) == "(" {
 
-				TmpToken.prefix = append(TmpToken.prefix, append(append(make([]string, 0), "()"), strings.Split(code[tokenizer.index][1:len(code[tokenizer.index])-1], ",")...)...) //REMOVE ( and ), AND SPLIT STRING WITH ","
+				tempToken.prefix = append(tempToken.prefix, append(append(make([]string, 0), "()"), strings.Split(code[tokenizer.index][1:len(code[tokenizer.index])-1], ",")...)...) //REMOVE ( and ), AND SPLIT STRING WITH ","
 			}
-			tokens = append(tokens, TmpToken)
-			TmpToken.prefix = nil
+			tokens = append(tokens, tempToken)
+			tempToken.prefix = nil
 			tokenizer.index-- //GO ONE BACK FOR NEXT LOOP
 		} else {
 			//MAKE SURE THAT IT IS IN A FUNCTION
 			if element != "]" && element != "[" && string(element[0]) != "(" {
-				if len(TmpToken.prefix) > 0 {
-					if TmpToken.prefix[0] == "T" { // T FOR TEXT
+				if len(tempToken.prefix) > 0 {
+					if tempToken.prefix[0] == "T" { // T FOR TEXT
 						tokens = append(tokens, Token{append(make([]string, 0), element), make([]Token, 0)}) //TEXT DONT SPLIT INTO ARRAY
 					} else {
 						tokens = append(tokens, Token{strings.Split(element, " "), make([]Token, 0)}) //NOT TEXT SPLIT INTO ARRAY
@@ -189,7 +163,6 @@ func tokenizeCode(code []string) []Token {
 					} else {
 						tokens = append(tokens, Token{strings.Split(element, " "), make([]Token, 0)}) //IF NOT IN FUNCTION SPLIT INTO ARRAY}
 					}
-
 				}
 
 			}

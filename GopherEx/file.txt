@@ -11,6 +11,10 @@ F box[
                     T TEXT 4
                     F box5[
                         T TEXT 5
+                        T TEXT 6
+                        S [
+                            ARGS
+                        ]
                     ]
             ]
         ]
