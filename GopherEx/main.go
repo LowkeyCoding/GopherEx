@@ -63,8 +63,7 @@ func main() {
 	parsedCode := parseCode(cleanCode)
 	//fmt.Println("________________________S")
 	//printCode(parsedCode)
-	//fmt.Println("A")
-	//printCode(parsedCode)
+	//printCode(cleanCode)
 	//printCode(parsedCode)
 	fmt.Println("")
 	printTokens(tokenizeCode(parsedCode), 0)
@@ -77,8 +76,20 @@ func sanitize(str string) []string {
 	tempCode := strings.Split(str, "\n")
 
 	for index := range tempCode {
-
 		tempCode[index] = strings.Replace(tempCode[index], string(rune(13)), "", -1) // REMOVE 13/CR
+
+		//REMOVE EXAMPLE "    T HELLO MA FRIEND" = "T HELLO MA FRIEND"
+		if tempCode[index] != "" {
+			i := 0
+			for string(tempCode[index][i]) == " " {
+				i++
+				if i >= len(tempCode[index]) {
+					break
+				}
+			}
+
+			tempCode[index] = tempCode[index][i:]
+		}
 	}
 
 	var array []string
@@ -86,8 +97,6 @@ func sanitize(str string) []string {
 		if _string == "" {
 			//fmt.Println(_string)
 		} else {
-			if len(_string) == 1 {
-			}
 			array = append(array, _string)
 		}
 	}
@@ -150,11 +159,10 @@ func tokenizeCode(code []string) []Token {
 			TmpToken.array = tokenizeCode(code[tokenizer.index+2 : i+tokenizer.index]) //CALL FUNCTION
 
 			tokenizer.index += i              //SKIP BEYOND FUNCTION
-			if tokenizer.index >= len(code) { //NO MORE TOKENS RETURN
-				fmt.Println("Er!")
+			if tokenizer.index >= len(code) { //NO MORE TOKENS RETURN LAST
+				//fmt.Println("LAST ELEMENT", element)
 				TmpToken.prefix = nil
 				TmpToken.prefix = append(TmpToken.prefix, strings.Split(element, " ")...)
-				//fmt.Println(TmpToken.prefix)
 				tokens = append(tokens, TmpToken)
 				return tokens
 			}
