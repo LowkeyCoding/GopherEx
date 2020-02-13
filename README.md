@@ -15,20 +15,6 @@
         key:val
     }
 
-    style_init_byte [
-        (style_byte args*)
+    name_args [
+        (type_byte args*)
     ]
-
-    generator_byte args* [
-        (type_byte content*)*
-    ]
-
-    type_byte [
-        (type_byte content*)*
-    ]
-
-
-
-    "generator_byte args [
-        type_byte content
-    ]"
