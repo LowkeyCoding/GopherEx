@@ -1,14 +1,59 @@
-T TEXT START
-box2()[
-T TEXT 99
-box(arg1,arg2)[
-T TEXT 1
-T TEXT 2
-]
-box(arg22,arg123132)
-T TEXT 66
+header_style()[
+    S align text center
+    S color black
+    S size 200%
+    S width 50%
+    S align box center
+    S border width 2px
+    S border style solid
 ]
 
-box3(arg69)[
-    T TEXT 001
+body_style()[
+    S margin 0px
+    S padding bottom 0px
+    S align text center
+    S color white
+    S size 100%
 ]
+
+box_style()[
+    S border width 2px
+    S border style solid
+    S width 50%
+    S background color gray
+    S align box center
+]
+
+box2(x,y)[
+    V x
+    T TEXT START
+    M x + 1
+    M x == 5 EXIT
+    box2(x)
+]
+
+S margin 0px
+S padding bottom 0px
+
+header_style()
+
+T Hello to my website
+
+S align text center  
+S color green
+S size 175%
+T Hello
+
+box_style()
+S box start
+S clear
+body_style()
+box2()
+
+
+S clear
+S color red
+S align center
+T helloooo
+
+S box end

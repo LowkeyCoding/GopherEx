@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -17,6 +18,7 @@ const (
 	ERROR_OUT_OF_BOUNDS = iota + 1
 	ERROR_WHITESPACE_IN_NAME
 	ERROR_UNIDENTIFIED_TYPE
+	ERROR_UNIDENTIFIED_OPERATOR
 	ERROR_WRONG_ARGUMENT_FORMAT
 	ERROR_FUNCTION_ALREADY_EXSITS
 	ERROR_FUNCTION_DOESNT_EXIST
@@ -27,9 +29,11 @@ const (
 type Tokenizer struct {
 	code      []string
 	tokens    []Token
-	functions map[string]bool
+	functions map[string]Token
 	index     int
 	typeBytes map[string]bool
+	html      string
+	styleMap  map[string]string
 }
 
 func (tokenizer Tokenizer) peak() string {
@@ -64,12 +68,20 @@ func (tokenizer *Tokenizer) tokenizeCode() Token {
 			if tokenizer.code[tokenizer.index] == "]" {
 				break
 			}
-			functionToken.tokens = append(functionToken.tokens, tokenizer.tokenizeCode())
+			tok := tokenizer.tokenizeCode()
+			//Check if token is empty (quick fix for functions)
+			if len(tok.identifiers) > 0 || len(tok.tokens) > 0 {
+				functionToken.tokens = append(functionToken.tokens, tok)
+			}
+
 		}
 		if len(tokenizer.code)-1 > tokenizer.index {
 			tokenizer.next()
 		}
-		return functionToken
+
+		tokenizer.functions[functionToken.identifiers[0]] = functionToken
+
+		//return functionToken
 	} else if tokenizer.isTypeByte() {
 		token := tokenizer.tokenizeType()
 		tokenizer.next()
@@ -93,8 +105,9 @@ func (tokenizer *Tokenizer) isFunction() bool {
 func (tokenizer *Tokenizer) isFunctionCall() bool {
 	functionName, _ := tokenizer.getFunctionIdentifiers()
 	//Check if function exist
-	if tokenizer.functions[functionName] {
-		return tokenizer.functions[functionName]
+	_, ok := tokenizer.functions[functionName]
+	if ok {
+		return ok //tokenizer.functions[functionName]
 	}
 	//Error if function does not exist
 	tokenizer.error(ERROR_FUNCTION_DOESNT_EXIST)
@@ -120,11 +133,13 @@ func (tokenizer *Tokenizer) isTypeByte() bool {
 func (tokenizer *Tokenizer) tokenizeFunction() Token {
 	functionName, UnformatedArguments := tokenizer.getFunctionIdentifiers()
 	//Check if function allready exists
+
 	if tokenizer.functionNameExists(functionName) {
 		tokenizer.error(ERROR_FUNCTION_ALREADY_EXSITS) //Exits with error
 	}
+	tokenizer.functions[functionName] = Token{}
 	//appends function to function list
-	tokenizer.functions[functionName] = true
+	//tokenizer.functions[functionName] = true
 	argumentNames := strings.Split(strings.Replace(UnformatedArguments, " ", "", -1), ",") //...
 	//Clean argument names + Check for whitespaces in argument names and whitespaces in function name
 	argumentNames = tokenizer.cleanArgumentNames(argumentNames)
@@ -240,7 +255,9 @@ func (tokenizer *Tokenizer) whitespaceInName(name string) {
 }
 
 func (tokenizer *Tokenizer) functionNameExists(functionName string) bool {
-	return tokenizer.functions[functionName]
+	_, ok := tokenizer.functions[functionName]
+	return ok //tokenizer.functions[functionName]
+
 }
 
 func (tokenizer *Tokenizer) cleanArgumentNames(names []string) []string {
@@ -259,7 +276,13 @@ func (tokenizer *Tokenizer) getFunctionIdentifiers() (string, string) {
 	arguments := strings.Split(UnformatedIdentifiers[len(UnformatedIdentifiers)-1], ")")
 	return functionName, arguments[0]
 }
+func (tokenizer *Tokenizer) getFunction(functionName string) Token {
+	if tokenizer.functionNameExists(functionName) {
+		tokenizer.error(ERROR_FUNCTION_DOESNT_EXIST)
+	}
 
+	return tokenizer.functions[functionName]
+}
 func main() {
 	b, err := ioutil.ReadFile("file.txt") // just pass the file name
 	if err != nil {
@@ -269,12 +292,41 @@ func main() {
 	cleanCode := sanitize(sourceCode)
 	parsedCode := parseCode(cleanCode)
 
-	tokenizer := Tokenizer{parsedCode, make([]Token, 0), map[string]bool{}, 0, map[string]bool{"T": true}}
+	tokenizer := Tokenizer{parsedCode, make([]Token, 0), map[string]Token{}, 0, map[string]bool{"T": true, "M": true, "S": true, "V": true}, "", make(map[string]string)}
 	tokens := make([]Token, 0)
 	for tokenizer.code[tokenizer.index] != "." {
-		tokens = append(tokens, tokenizer.tokenizeCode())
+		tok := tokenizer.tokenizeCode()
+
+		//Check if token is empty (quick fix for functions)
+		if len(tok.identifiers) > 0 || len(tok.tokens) > 0 {
+			tokens = append(tokens, tok)
+		}
 	}
+	fmt.Println("------------MAIN CODE------------ ")
 	printTokens(tokens, 0)
+	fmt.Println("------------FUNCTIONS------------ ")
+	for k, v := range tokenizer.functions {
+		fmt.Println()
+		fmt.Println("Function :", k)
+		tmpAr := make([]Token, 0)
+		tmpAr = append(tmpAr, v)
+		printTokens(tmpAr, 0)
+	}
+
+	fmt.Println("------------PROGRAM START------------ ")
+	tokenizer.generatePrint(tokens, make(map[string]int))
+
+	fmt.Println("------------HTML------------ ")
+	fmt.Println(tokenizer.html)
+	d1 := []byte(tokenizer.html)
+	ioutil.WriteFile("index.html", d1, 0644)
+	fmt.Println("------------TEST------------ ")
+	/*
+		ar := make([]string, 0)
+		ar = append(ar, "align")
+		ar = append(ar, "left")
+		fmt.Println(tokenizer.style(ar))*/
+
 }
 
 func sanitize(str string) []string {
@@ -338,7 +390,7 @@ func parseCode(code []string) []string {
 
 func tokenizeCode(code []string) []Token {
 
-	tokenizer := Tokenizer{code, make([]Token, 0), map[string]bool{}, -1, map[string]bool{}}
+	tokenizer := Tokenizer{code, make([]Token, 0), map[string]Token{}, -1, map[string]bool{}, "", make(map[string]string)}
 	tokens := make([]Token, 0)
 	tempToken := Token{make([]string, 0), make([]Token, 0)}
 
@@ -413,4 +465,292 @@ func printCode(code []string) {
 	for _, _string := range code {
 		fmt.Println(_string)
 	}
+}
+func joinMap(smap map[string]string) string {
+
+	str := ""
+	if len(smap) > 0 {
+		str = str + " style=\""
+	} else {
+		return str
+	}
+	for key, value := range smap {
+		str = str + key + ":" + value + ";"
+	}
+	str = str + "\""
+	return str
+}
+func (tokenizer *Tokenizer) style(styles []string) string {
+	if styles[0] == "clear" {
+		tokenizer.styleMap = make(map[string]string)
+		return ""
+	}
+	args := 2
+	for i := 0; i < len(styles)-1; i += args {
+		switch styles[i] {
+		case "align":
+			if styles[i+1] == "text" {
+				if styles[i+2] == "left" {
+					tokenizer.styleMap["text-align"] = "left"
+				}
+
+				if styles[i+2] == "right" {
+					tokenizer.styleMap["text-align"] = "right"
+				}
+
+				if styles[i+2] == "center" {
+					tokenizer.styleMap["text-align"] = "center"
+				}
+			}
+
+			if styles[i+1] == "box" {
+				if styles[i+2] == "center" {
+					tokenizer.styleMap["margin"] = "0 auto"
+				}
+			}
+
+			args = 3
+			break
+
+		case "color":
+			tokenizer.styleMap["color"] = styles[i+1]
+			args = 2
+			break
+
+		case "size":
+			tokenizer.styleMap["font-size"] = styles[i+1]
+			args = 2
+			break
+
+		case "padding":
+			if styles[i+1] == "left" {
+				tokenizer.styleMap["padding-left"] = styles[i+2]
+			}
+
+			if styles[i+1] == "right" {
+				tokenizer.styleMap["padding-right"] = styles[i+2]
+			}
+
+			if styles[i+1] == "top" {
+				tokenizer.styleMap["padding-top"] = styles[i+2]
+			}
+			if styles[i+1] == "bottom" {
+				tokenizer.styleMap["padding-bottom"] = styles[i+2]
+			}
+			args = 3
+			break
+
+		case "margin":
+			tokenizer.styleMap["margin"] = styles[i+1]
+			if styles[i+1] == "left" {
+				tokenizer.styleMap["margin-left"] = styles[i+2]
+			}
+
+			if styles[i+1] == "right" {
+				tokenizer.styleMap["margin-right"] = styles[i+2]
+			}
+
+			if styles[i+1] == "top" {
+				tokenizer.styleMap["margin-top"] = styles[i+2]
+			}
+			if styles[i+1] == "bottom" {
+				tokenizer.styleMap["margin-bottom"] = styles[i+2]
+			}
+			args = 3
+			break
+
+		case "box":
+			if styles[i+1] == "start" {
+				tokenizer.html = tokenizer.html + "<div" + joinMap(tokenizer.styleMap) + ">"
+			}
+			if styles[i+1] == "end" {
+				tokenizer.html = tokenizer.html + "</div>"
+			}
+			args = 2
+			break
+		case "border":
+			if styles[i+1] == "radius" {
+				tokenizer.styleMap["border-radius"] = styles[i+2]
+			}
+
+			if styles[i+1] == "style" {
+				tokenizer.styleMap["border-style"] = styles[i+2]
+			}
+
+			if styles[i+1] == "width" {
+				tokenizer.styleMap["border-width"] = styles[i+2]
+			}
+			args = 3
+			break
+
+		case "width":
+			tokenizer.styleMap["width"] = styles[i+1]
+			args = 2
+			break
+		case "height":
+			tokenizer.styleMap["height"] = styles[i+1]
+			args = 2
+			break
+		case "background":
+			if styles[i+1] == "color" {
+				tokenizer.styleMap["background-color"] = styles[i+2]
+			}
+			args = 3
+			break
+
+		}
+
+	}
+	return joinMap(tokenizer.styleMap)
+}
+func (tokenizer *Tokenizer) generatePrint(tokens []Token, varibels map[string]int) {
+	for _, element := range tokens {
+		switch element.identifiers[0] {
+		case "T":
+			fmt.Println(element.identifiers[1])
+			tokenizer.html = tokenizer.html + "<p" + joinMap(tokenizer.styleMap) + ">" + element.identifiers[1] + "</p>"
+			break
+		case "V":
+			//Printsvarible
+			for _, variabelName := range element.identifiers[1:] {
+				fmt.Println(varibels[variabelName])
+				tokenizer.html = tokenizer.html + "<p" + joinMap(tokenizer.styleMap) + ">" + strconv.Itoa(varibels[variabelName]) + "</p>"
+			}
+			break
+		case "M":
+			result, command := evaluateMath(element.identifiers[1:], varibels)
+
+			if command == "SET" {
+				varibels[element.identifiers[1]] = result
+			}
+			if command == "EXIT" {
+				return
+			}
+			break
+		case "S":
+			tokenizer.style(element.identifiers[1:])
+			break
+		}
+		token, isFunction := tokenizer.functions[element.identifiers[0]]
+		//call function and handle return
+		if isFunction && len(element.tokens) == 0 {
+			parsedVaribels := make(map[string]int)
+			if len(element.identifiers) > 1 {
+				for index, variabelName := range element.identifiers[1:] {
+					number := 0
+					if varibels[variabelName] != 0 {
+						number = varibels[variabelName]
+					} else {
+						parsedNumber, err := strconv.Atoi(variabelName)
+						if err != nil {
+							number = 0
+						} else {
+							number = parsedNumber
+						}
+					}
+					parsedVaribels[token.identifiers[index+1]] = number
+				}
+			}
+
+			tmpTok := make([]Token, 0)
+			tmpTok = append(tmpTok, token)
+			tokenizer.generatePrint(tmpTok, parsedVaribels)
+		}
+
+		//If function
+		if len(element.tokens) > 0 { //Check if token has sub tokens
+			//Function start (ignore)
+			//Function content called
+			//Return argument
+			tokenizer.generatePrint(element.tokens, varibels)
+		}
+	}
+
+}
+func evaluateMath(mathExpression []string, varibels map[string]int) (int, string) {
+	command := ""
+	lastValue := 0
+	currentValue := 0
+	currentOperator := ""
+	result := 0
+	for _, value := range mathExpression {
+		parsedInteger, err := strconv.Atoi(value)
+		if err != nil {
+			currentValue = varibels[value]
+		} else {
+			currentValue = parsedInteger
+		}
+		if !isMathOperator(value) && !isCheckOperator(value) {
+			fmt.Println("currentOperator:", currentOperator, "MathOperator: ", isMathOperator(currentOperator))
+			if currentOperator == "" {
+				lastValue = currentValue
+			} else if isMathOperator(currentOperator) {
+				result = evaluateMathOperation(lastValue, currentValue, currentOperator)
+				currentOperator = ""
+				lastValue = result
+				command = "SET"
+			} else {
+				if evaluateCheckOperation(lastValue, currentValue, currentOperator) {
+					command = "EXIT" //exits function
+					break
+				} else {
+					return 0, "" //Nothing happens
+				}
+			}
+		} else {
+			fmt.Println(value)
+			currentOperator = value
+		}
+	}
+	fmt.Println("result:", result)
+	return result, command
+}
+func evaluateMathOperation(x int, y int, operator string) int {
+	switch operator {
+	case "+":
+		return x + y
+	case "-":
+		return x - y
+	case "*":
+		return x * y
+	case "/":
+		return x / y
+	case "=":
+		return y
+	default:
+		os.Exit(ERROR_UNIDENTIFIED_OPERATOR)
+	}
+	return 0
+}
+func evaluateCheckOperation(x int, y int, operator string) bool {
+	switch operator {
+	case "==":
+		return x == y
+	case "<":
+		return x < y
+	case ">":
+		return x > y
+	default:
+		os.Exit(ERROR_UNIDENTIFIED_OPERATOR)
+	}
+	return false
+}
+func isMathOperator(operator string) bool {
+	if operator == "+" ||
+		operator == "-" ||
+		operator == "*" ||
+		operator == "/" ||
+		operator == "=" {
+		return true
+	}
+	return false
+}
+
+func isCheckOperator(operator string) bool {
+	if operator == "==" ||
+		operator == ">" ||
+		operator == "<" {
+		return true
+	}
+	return false
 }
